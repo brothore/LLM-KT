@@ -1,0 +1,24 @@
+dataset:
+  snapshot: ../data/snapshots/assist2009
+  split: test
+  validation_fold: 0
+task:
+  protocol: pykt_window
+  level: question
+  maxlen: 200
+model:
+  adapter: openrouter_decisions
+  model_id: typesafe/jev-1.14
+  endpoint: https://openrouter.ai/api/alpha/decisions
+  api_key_env: OPENROUTER_API_KEY
+  api_key_file: ../../.secrets/openrouter.key
+  probability_strategy: noul
+  pricing_file: pricing/jev-1.14.json
+execution:
+  max_concurrency: 4
+  max_requests: 20
+  requests_per_minute: 60
+  max_attempts: 3
+evaluation:
+  profile: standard_v1
+  student_std_ddof: 1

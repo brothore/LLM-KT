@@ -1,0 +1,14 @@
+dataset:
+  snapshot: ../data/snapshots/demo
+task:
+  protocol: pykt_window
+  level: question
+  maxlen: 4
+  min_seq_len: 3
+model:
+  adapter: mock
+  model_id: mock-history-frequency-v1
+  probability_strategy: mock
+execution:
+  requests_per_minute: 60000
+  max_requests: 100

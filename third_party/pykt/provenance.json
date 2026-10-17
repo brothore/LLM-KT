@@ -1,0 +1,78 @@
+{
+  "adaptations": [
+    {
+      "path": "src/llm_kt/vendor/pykt/sequence.py",
+      "source_functions": [
+        "generate_sequences",
+        "generate_window_sequences"
+      ],
+      "changes": "Converted dataframe generation to pure history/target index ranges; no runtime dependency on original repository."
+    },
+    {
+      "path": "src/llm_kt/vendor/pykt/student_metrics.py",
+      "changes": "Copied functions verbatim; only numpy imported; no upstream runtime dependency.",
+      "source_functions": [
+        "calculate_wealth_metrics",
+        "gini_coefficient",
+        "sliding_window_collect"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "sha256": "4753f4d51dfeb036e6b45d34c332b8fb5b2d7b379d5d530e7f2867d7a5a2f761",
+      "local_path": "reference/split_datasets_que.py",
+      "upstream_path": "pykt/preprocess/split_datasets_que.py"
+    },
+    {
+      "sha256": "9fc86ee939e94146f7c325ee657b9810b20143863458b32d236fe404e1e4ffcf",
+      "local_path": "reference/split_datasets.py",
+      "upstream_path": "pykt/preprocess/split_datasets.py"
+    },
+    {
+      "sha256": "6b06c0793aee841553d461b4bb4591d3b6ddce38e241459186f6feb93bd6d0a0",
+      "local_path": "reference/cal_unbalance.py",
+      "upstream_path": "examples/cal_unbalance.py"
+    }
+  ],
+  "copied_at": "2026-10-17",
+  "repository": "https://github.com/brothore/pykt-toolkit",
+  "commit": "a0cc4151f0b8c740b60c1cb18a070c8885baa9a6",
+  "preprocessing_files": [
+    {
+      "local_path": "src/llm_kt/vendor/pykt/preprocess/assist2009_preprocess.py",
+      "source_sha256": "039781e707646911997a028f263db6476f1d6f0e2261a66e8c2308d7d2c2be3a",
+      "changes": "Unmodified source copy",
+      "upstream_path": "pykt/preprocess/assist2009_preprocess.py",
+      "local_sha256": "039781e707646911997a028f263db6476f1d6f0e2261a66e8c2308d7d2c2be3a"
+    },
+    {
+      "local_path": "src/llm_kt/vendor/pykt/preprocess/nips_task34_preprocess.py",
+      "source_sha256": "92d20e20e9a008a08b136af397c9c1bf9e789c8b73d875261f1f3e5fb6b4dbe8",
+      "changes": "Replace eval with ast.literal_eval; memoize unchanged timestamp converter for duplicate strings; split/ordering semantics unchanged",
+      "upstream_path": "pykt/preprocess/nips_task34_preprocess.py",
+      "local_sha256": "a5264e02538233bc0ea8407f43f225d2630d4ceb45f372b403ac9f4ca5ac1d80"
+    },
+    {
+      "local_path": "src/llm_kt/vendor/pykt/preprocess/utils.py",
+      "source_sha256": "3a53e434b98dd5fd339f8776d0089376cb5cd0f2a46673a48b481914ebeb236d",
+      "changes": "Unmodified source copy",
+      "upstream_path": "pykt/preprocess/utils.py",
+      "local_sha256": "3a53e434b98dd5fd339f8776d0089376cb5cd0f2a46673a48b481914ebeb236d"
+    },
+    {
+      "local_path": "src/llm_kt/vendor/pykt/preprocess/split_datasets.py",
+      "source_sha256": "9fc86ee939e94146f7c325ee657b9810b20143863458b32d236fe404e1e4ffcf",
+      "changes": "Unmodified source copy",
+      "upstream_path": "pykt/preprocess/split_datasets.py",
+      "local_sha256": "9fc86ee939e94146f7c325ee657b9810b20143863458b32d236fe404e1e4ffcf"
+    },
+    {
+      "local_path": "src/llm_kt/vendor/pykt/preprocess/split_datasets_que.py",
+      "source_sha256": "4753f4d51dfeb036e6b45d34c332b8fb5b2d7b379d5d530e7f2867d7a5a2f761",
+      "changes": "Unmodified source copy",
+      "upstream_path": "pykt/preprocess/split_datasets_que.py",
+      "local_sha256": "4753f4d51dfeb036e6b45d34c332b8fb5b2d7b379d5d530e7f2867d7a5a2f761"
+    }
+  ]
+}
