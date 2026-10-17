@@ -1,0 +1,9 @@
+{
+  "description": "Compact JSON with history key first; identical semantic data and character count to original current-first JSON. Shares 0.50 USD ledger.",
+  "cases": [
+    {"name":"q38_chutes_compact_growth","model":"qwen/qwen3.8-27b","provider":"chutes/fp8","layout":"history_first_json","indices":[150,151,152]},
+    {"name":"q38_chutes_compact_boundary","model":"qwen/qwen3.8-27b","provider":"chutes/fp8","layout":"history_first_json","indices":[198,199,200,201,202]},
+    {"name":"q36_akash_compact_growth","model":"qwen/qwen3.6-35b-a3b","provider":"akashml/fp8","layout":"history_first_json","indices":[150,151,152]},
+    {"name":"q36_akash_compact_boundary","model":"qwen/qwen3.6-35b-a3b","provider":"akashml/fp8","layout":"history_first_json","indices":[198,199,200,201,202]}
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "description": "Same facts and window protocol; original-vs-history-first layout and rolling-window boundary. Shares original budget ledger.",
+  "cases": [
+    {
+      "name": "q38_chutes_current_growth",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "chutes/fp8",
+      "layout": "current_first",
+      "indices": [
+        150,
+        151,
+        152
+      ]
+    },
+    {
+      "name": "q38_chutes_history_boundary",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "chutes/fp8",
+      "layout": "history_first",
+      "indices": [
+        198,
+        199,
+        200,
+        201,
+        202
+      ]
+    },
+    {
+      "name": "q38_chutes_current_boundary",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "chutes/fp8",
+      "layout": "current_first",
+      "indices": [
+        198,
+        199,
+        200,
+        201,
+        202
+      ]
+    },
+    {
+      "name": "q38_near_current_growth",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "near-ai/fp8",
+      "layout": "current_first",
+      "indices": [
+        150,
+        151,
+        152
+      ]
+    },
+    {
+      "name": "q38_near_history_boundary",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "near-ai/fp8",
+      "layout": "history_first",
+      "indices": [
+        198,
+        199,
+        200,
+        201,
+        202
+      ]
+    },
+    {
+      "name": "q38_deepinfra_current_growth",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "deepinfra/bf16",
+      "layout": "current_first",
+      "indices": [
+        150,
+        151,
+        152
+      ]
+    },
+    {
+      "name": "q38_deepinfra_history_boundary",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "deepinfra/bf16",
+      "layout": "history_first",
+      "indices": [
+        198,
+        199,
+        200,
+        201,
+        202
+      ]
+    }
+  ]
+}

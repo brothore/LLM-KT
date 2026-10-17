@@ -6,7 +6,7 @@ from .pricing import load_pricing
 
 DEFAULTS = {
     "dataset": {"snapshot": "", "split": "test", "validation_fold": 0},
-    "task": {"protocol": "pykt_window", "level": "question", "maxlen": 200, "min_seq_len": 3},
+    "task": {"protocol": "pykt_window", "level": "question", "maxlen": 200, "min_seq_len": 3, "target_limit": None},
     "input": {"template": "history_ids_v1", "history_policy": "protocol_exact"},
     "model": {"adapter": "openrouter_decisions", "model_id": "typesafe/jev-1.14",
               "endpoint": "https://openrouter.ai/api/alpha/decisions", "api_key_env": "OPENROUTER_API_KEY",
@@ -44,6 +44,8 @@ def load_config(path):
             raise ValueError(f"task.{key} must be an integer >= 2")
     if task["min_seq_len"] > task["maxlen"]:
         raise ValueError("min_seq_len cannot exceed maxlen")
+    if task['target_limit'] is not None and (type(task['target_limit']) is not int or task['target_limit'] < 1):
+        raise ValueError('target_limit must be null or a positive integer')
     if type(ds["validation_fold"]) is not int:
         raise ValueError("validation_fold must be an integer")
     if result["input"] != DEFAULTS["input"]:

@@ -1,0 +1,13 @@
+{
+  "description": "Growing histories, same student, sequential next-target inference; final exact repeat is a control. Shared budget is 0.50 USD.",
+  "cases": [
+    {"name":"q38_chutes_history","model":"qwen/qwen3.8-27b","provider":"chutes/fp8","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q38_near_history","model":"qwen/qwen3.8-27b","provider":"near-ai/fp8","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q38_deepinfra_history","model":"qwen/qwen3.8-27b","provider":"deepinfra/bf16","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q38_akash_history","model":"qwen/qwen3.8-27b","provider":"akashml/fp8","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q38_parasail_history","model":"qwen/qwen3.8-27b","provider":"parasail/fp8","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q36_darkbloom_history","model":"qwen/qwen3.6-35b-a3b","provider":"darkbloom/fp4","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q36_akash_history","model":"qwen/qwen3.6-35b-a3b","provider":"akashml/fp8","layout":"history_first","indices":[150,151,152,152]},
+    {"name":"q36_parasail_history","model":"qwen/qwen3.6-35b-a3b","provider":"parasail/fp8","layout":"history_first","indices":[150,151,152,152]}
+  ]
+}

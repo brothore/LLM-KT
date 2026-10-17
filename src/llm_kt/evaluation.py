@@ -3,7 +3,8 @@ from collections import defaultdict
 from pathlib import Path
 import numpy as np
 from sklearn.metrics import roc_auc_score, accuracy_score, log_loss, brier_score_loss
-from .common import read_jsonl, read_json, write_json
+from .common import read_jsonl, read_json, write_json, digest, file_hash
+from .artifacts import finish_stage, verify_stage, record_event, code_identity
 from .domain import checked_probability
 from .protocols import load_prepared
 from .vendor.pykt.student_metrics import sliding_window_collect, calculate_wealth_metrics
@@ -87,6 +88,12 @@ def evaluate(prepared, run_directory, profile=None):
     config = {**config, "profile": profile}
     if profile == "pykt_legacy_v1":
         config["student_std_ddof"] = 1
+    identity = {"task_id": task["task_id"], "predictions_sha256": file_hash(root / "predictions.jsonl"), "evaluation_config": config, "source_sha256": code_identity()["source_sha256"]}
+    cached = root / "evaluations" / digest(identity)
+    if cached.exists():
+        artifact = verify_stage(cached)
+        record_event(cached, "evaluate", artifact["artifact_id"], True, {})
+        return read_json(cached / "metrics.json")
     report, students = calculate(targets, read_jsonl(root / "predictions.jsonl"), config, profile == "pykt_legacy_v1")
     report["task_id"] = task["task_id"]
     report["complete"] = report["coverage"]["prediction_coverage"] == 1
@@ -101,6 +108,11 @@ def evaluate(prepared, run_directory, profile=None):
             f"Overall AUC: {report['overall']['auc']}\n\nStudent AUC mean/std: {report['student_auc']['mean']} / {report['student_auc']['std']}\n\n"
             f"Valid AUC students: {report['coverage']['n_valid_auc_students']}/{len(students)}\n")
     (root / f"report_{profile}.md").write_text(text, encoding="utf-8")
+    import shutil
+    write_json(cached / "metrics.json", report)
+    shutil.copyfile(root / f"per_student_{profile}.csv", cached / "per_student.csv")
+    (cached / "report.md").write_text(text, encoding="utf-8")
+    finish_stage(cached, "evaluate", identity, ["metrics.json", "per_student.csv", "report.md"], [task["task_id"]])
     return report
 
 
@@ -128,4 +140,10 @@ def compare(prepared, runs, output):
         result, _ = calculate(selected, [index[s] for s in common], configs[0], configs[0]["profile"] == "pykt_legacy_v1")
         report["runs"].append({"run": str(Path(directory).resolve()), "individual_coverage": len(index) / len(targets), "metrics_on_common_targets": result})
     write_json(output, report)
+    cached = Path(output).parent / (Path(output).stem + '.artifacts') / digest(report)
+    if cached.exists():
+        verify_stage(cached)
+    else:
+        write_json(cached / 'comparison.json', report)
+        finish_stage(cached, 'compare', {'report_hash': digest(report), 'prediction_hashes': [file_hash(Path(r) / 'predictions.jsonl') for r in runs]}, ['comparison.json'], [task['task_id']])
     return report

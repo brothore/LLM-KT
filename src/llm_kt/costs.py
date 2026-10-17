@@ -5,6 +5,7 @@ from .common import canonical, digest, read_json, read_jsonl, write_json
 from .data import stream_snapshot
 from .domain import ModelInput
 from .providers import make_provider
+from .selection import target_selection
 from .vendor.pykt.sequence import target_ranges
 
 
@@ -24,6 +25,7 @@ def request_character_totals(config):
     """Exact character proxy for all requests in O(events+targets), without expanding histories."""
     snapshot, rows = stream_snapshot(config)
     task, model = config["task"], config["model"]
+    selected = target_selection(snapshot, config)
     if snapshot["representation"] == "concept_expanded" and task["protocol"] != "full_prefix":
         raise ValueError("Expanded concept input requires full_prefix in v0.1")
     provider = make_provider(model)
@@ -44,6 +46,8 @@ def request_character_totals(config):
             prefix.append(prefix[-1] + len(canonical({**item, "correct": bool(event["response"])})))
         contributed = False
         for start, index in target_ranges(len(events), task["protocol"], task["maxlen"], task["min_seq_len"]):
+            if selected is not None and (row["student_id"], index) not in selected:
+                continue
             length = index - start
             chars = constant + item_lengths[index] + prefix[index] - prefix[start] + max(0, length - 1)
             requests += 1
@@ -198,3 +202,12 @@ def save_estimate(path, result):
         lines.append(f"| {row['provider']} | {cur['input_usd']:.4f} | {cur['output_usd']:.4f} | {cur['total_usd']:.4f} | {row['input_token_sensitivity_low']['total_usd']:.4f}–{row['input_token_sensitivity_high']['total_usd']:.4f} |")
     lines += ["", "These are conditional estimates, not quotes or spending limits.", "", "Assumptions:", "", "```json", canonical(result["assumptions"]), "```", "", *["- " + w for w in result["warnings"]]]
     path.with_suffix('.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    from .artifacts import finish_stage, verify_stage
+    import shutil
+    cached = path.parent / (path.stem + '.artifacts') / digest(result)
+    if cached.exists():
+        verify_stage(cached)
+    else:
+        write_json(cached / 'estimate.json', result)
+        shutil.copyfile(path.with_suffix('.md'), cached / 'estimate.md')
+        finish_stage(cached, 'estimate', {'result_hash': digest(result)}, ['estimate.json', 'estimate.md'], [result['volume']['snapshot_id']])

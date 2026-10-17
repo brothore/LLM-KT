@@ -1,0 +1,54 @@
+{
+  "model_id": "qwen/qwen3.8-27b",
+  "currency": "USD",
+  "unit": "per_million_tokens",
+  "verified_at": "2026-10-18",
+  "source": "https://openrouter.ai/api/v1/models/qwen/qwen3.8-27b/endpoints",
+  "endpoints": [
+    {
+      "provider": "Chutes",
+      "tag": "chutes/fp8",
+      "input_per_million_usd": 0.039,
+      "output_per_million_usd": 1.25,
+      "cache_read_per_million_usd": 0.0039000000000000003,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
+    },
+    {
+      "provider": "Near AI",
+      "tag": "near-ai/fp8",
+      "input_per_million_usd": 0.04,
+      "output_per_million_usd": 1.35,
+      "cache_read_per_million_usd": 0.018,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
+    },
+    {
+      "provider": "DeepInfra",
+      "tag": "deepinfra/bf16",
+      "input_per_million_usd": 0.15,
+      "output_per_million_usd": 1.875,
+      "cache_read_per_million_usd": 0.0375,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
+    },
+    {
+      "provider": "AkashML",
+      "tag": "akashml/fp8",
+      "input_per_million_usd": 0.22499999999999998,
+      "output_per_million_usd": 1.9800000000000002,
+      "cache_read_per_million_usd": 0.049999999999999996,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
+    },
+    {
+      "provider": "Parasail",
+      "tag": "parasail/fp8",
+      "input_per_million_usd": 0.24,
+      "output_per_million_usd": 2.2,
+      "cache_read_per_million_usd": 0.049999999999999996,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
+    }
+  ]
+}

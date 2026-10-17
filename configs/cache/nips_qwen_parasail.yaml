@@ -1,0 +1,34 @@
+dataset:
+  snapshot: ../../data/snapshots/nips_task34_0p1pct
+  split: test
+  validation_fold: 0
+task:
+  protocol: pykt_window
+  level: question
+  maxlen: 200
+  min_seq_len: 3
+  target_limit: 1
+model:
+  pricing_file: ../pricing/qwen3.6-35b-a3b.json
+  api_key_file: ../../../.secrets/openrouter.key
+  adapter: openai_compatible_chat
+  model_id: qwen/qwen3.6-35b-a3b
+  endpoint: https://openrouter.ai/api/v1/chat/completions
+  probability_strategy: json_probability
+  parameters:
+    reasoning:
+      enabled: false
+    max_tokens: 256
+    temperature: 0
+    response_format:
+      type: json_object
+    provider:
+      only:
+      - parasail/fp8
+      allow_fallbacks: false
+execution:
+  max_requests: 1
+  max_attempts: 1
+  max_concurrency: 1
+  requests_per_minute: 60
+  timeout_seconds: 60

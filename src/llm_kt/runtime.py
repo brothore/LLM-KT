@@ -6,10 +6,13 @@ import random
 import sqlite3
 import csv
 import time
+import re
+from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
-from .common import canonical, digest, read_json, write_json, write_jsonl
+from .common import canonical, digest, read_json, write_json, write_jsonl, file_hash
+from .artifacts import finish_stage, record_event, code_identity, verify_stage
 from .protocols import load_prepared
 from .providers import make_provider
 from .credentials import resolve_api_key
@@ -32,25 +35,43 @@ class RateGate:
 def preview(config, prepared, count=2):
     manifest, _, inputs = load_prepared(prepared, config)
     provider = make_provider(config["model"])
-    return {"task_id": manifest["task_id"], "n_targets": len(inputs),
+    result = {"task_id": manifest["task_id"], "n_targets": len(inputs),
             "max_http_attempts_this_invocation": config["execution"]["max_requests"],
             "sample_requests": [provider.request(item) for item in inputs[:count]]}
+    folder = Path(prepared) / "previews" / digest(result)
+    if (folder / "artifact_manifest.json").exists():
+        verify_stage(folder)
+    else:
+        write_json(folder / "preview.json", result)
+        finish_stage(folder, "preview", {"content_hash": digest(result)}, ["preview.json"], [manifest["task_id"]])
+    return result
 
 
 async def infer(config, prepared, run_directory):
     task, _, inputs = load_prepared(prepared, config)
     root = Path(run_directory).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    # Keep a self-contained, hashed link to the exact prepared inputs and labels.
+    import shutil
+    prepared_copy = root / "prepared"
+    if prepared_copy.exists():
+        verify_stage(prepared_copy)
+    else:
+        prepared_copy.mkdir()
+        for name in ("manifest.json", "inputs.jsonl", "targets.jsonl", "identity_map.jsonl", "artifact_manifest.json"):
+            source = Path(prepared) / name
+            if source.exists():
+                shutil.copyfile(source, prepared_copy / name)
     model, ex = config["model"], config["execution"]
     provider = make_provider(model)
-    run_identity = {"schema_version": 1, "config": config, "task_id": task["task_id"], "input_hash": task["input_hash"]}
+    run_identity = {"schema_version": 2, "config": config, "task_id": task["task_id"], "input_hash": task["input_hash"], "source_sha256": code_identity()["source_sha256"]}
     manifest_path = root / "manifest.json"
     if manifest_path.exists():
         old = read_json(manifest_path)
         if old["identity"] != run_identity:
             raise ValueError("Run configuration/data changed; create a new run directory")
     else:
-        write_json(manifest_path, {"identity": run_identity, "created_at": datetime.now(timezone.utc).isoformat(), "package_version": "0.1.0"})
+        write_json(manifest_path, {"identity": run_identity, "run_id": "run_" + uuid4().hex, "created_at": datetime.now(timezone.utc).isoformat(), "code": code_identity(), "package_version": "0.1.0"})
     # A process lock prevents concurrent writers/runners; OS releases it on crash.
     lock = (root / "run.lock").open("a+b")
     try:
@@ -72,7 +93,7 @@ async def infer(config, prepared, run_directory):
 
 async def _execute(config, task, inputs, provider, root):
     model, ex = config["model"], config["execution"]
-    key = resolve_api_key(model)
+    key = None
     db = sqlite3.connect(root / "state.sqlite")
     db.execute("PRAGMA journal_mode=WAL")
     db.execute("CREATE TABLE IF NOT EXISTS jobs(sample_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, result TEXT, error TEXT)")
@@ -91,6 +112,24 @@ async def _execute(config, task, inputs, provider, root):
         state = db.execute("SELECT status,attempts FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
         if state[0] == "pending" and state[1] < ex["max_attempts"]:
             queue.put_nowait(item)
+        elif state[0] == "success":
+            cached = json.loads(db.execute("SELECT result FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()[0])
+            evidence = read_json(root / "attempts" / (cached["local_request_id"] + ".json"))
+            for name, expected in evidence["files"].items():
+                if file_hash(root / name) != expected:
+                    db.close()
+                    raise ValueError("Cached attempt artifact hash mismatch")
+            if evidence.get("result_hash") != digest(cached):
+                raise ValueError("Cached prediction differs from attempt evidence")
+    if not queue.empty():
+        try:
+            key = resolve_api_key(model)
+        except Exception:
+            db.close()
+            raise
+    invocation_id = "inv_" + uuid4().hex
+    invocation_root = root / "invocations" / invocation_id
+    write_json(invocation_root / "invocation.json", {"invocation_id": invocation_id, "run_id": read_json(root / "manifest.json")["run_id"], "started_at": datetime.now(timezone.utc).isoformat(), "code": code_identity()})
     dispatched, stop = 0, asyncio.Event()
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"} if key else {}
     started = time.monotonic()
@@ -111,10 +150,14 @@ async def _execute(config, task, inputs, provider, root):
                     dispatched += 1
                     state = db.execute("SELECT attempts,request_hash FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
                     attempt = state[0] + 1
-                    request_id = f"{item.sample_id}_{attempt}"
+                    request_id = "attempt_" + uuid4().hex
                     db.execute("UPDATE jobs SET status='running',attempts=? WHERE sample_id=?", (attempt, item.sample_id))
                     db.commit()
                     write_json(root / "requests" / f"{request_id}.json", payload)
+                    body_path = root / "requests" / f"{request_id}.body.txt"
+                    body_path.write_bytes(httpx.Request("POST", model["endpoint"], json=payload).content)
+                    evidence = {"attempt_id": request_id, "invocation_id": invocation_id, "run_id": read_json(root / "manifest.json")["run_id"], "task_id": task["task_id"], "sample_id": item.sample_id, "request_hash": state[1], "attempt_number": attempt, "started_at": datetime.now(timezone.utc).isoformat(), "endpoint": model["endpoint"], "model_requested": model["model_id"], "status": "running", "files": {}}
+                    write_json(root / "attempts" / f"{request_id}.json", evidence)
                     tick = time.monotonic()
                     retryable, fatal, response, error, wait_seconds = False, False, None, None, 0
                     try:
@@ -123,6 +166,16 @@ async def _execute(config, task, inputs, provider, root):
                             response = {"p_correct": (sum(h["correct"] for h in history) + 1) / (len(history) + 2), "model": "mock-history-frequency-v1"}
                         else:
                             http = await client.post(model["endpoint"], headers=headers, json=payload)
+                            raw = http.text
+                            if key:
+                                raw = raw.replace(key, "[REDACTED]")
+                            raw = re.sub(r"sk-or-v1-[A-Za-z0-9_-]+", "[REDACTED]", raw)
+                            raw_path = root / "responses" / f"{request_id}.body.txt"
+                            raw_path.parent.mkdir(parents=True, exist_ok=True)
+                            raw_path.write_text(raw, encoding="utf-8")
+                            evidence["credential_redaction_applied"] = raw != http.text
+                            evidence["http_status"] = http.status_code
+                            evidence["response_headers"] = {k: v for k, v in http.headers.items() if k.lower() in {"content-type", "date", "x-request-id", "request-id", "retry-after"}}
                             if http.status_code >= 400:
                                 retryable = http.status_code == 429 or http.status_code in {500, 502, 503, 504}
                                 fatal = http.status_code in {400, 401, 403, 404, 422}
@@ -132,7 +185,7 @@ async def _execute(config, task, inputs, provider, root):
                                     wait_seconds = 0
                                 write_json(root / "responses" / f"{request_id}.json", {"http_status": http.status_code})
                                 raise ValueError(f"HTTP {http.status_code}")
-                            response = http.json()
+                            response = json.loads(raw)
                         write_json(root / "responses" / f"{request_id}.json", response)
                         probability = provider.probability(response)
                         usage = response.get("usage") or {}
@@ -158,6 +211,13 @@ async def _execute(config, task, inputs, provider, root):
                     db.execute("INSERT OR REPLACE INTO attempts VALUES(?,?,?,?,?,?)", (request_id, item.sample_id,
                                "failed" if error else "success", (time.monotonic() - tick) * 1000, canonical(usage), error))
                     db.commit()
+                    evidence.update(status="failed" if error else "success", ended_at=datetime.now(timezone.utc).isoformat(), latency_ms=(time.monotonic() - tick) * 1000, error=error, usage=usage)
+                    if not error:
+                        evidence["result_hash"] = digest(result)
+                    for folder in ("requests", "responses"):
+                        for path in (root / folder).glob(request_id + ".*"):
+                            evidence["files"][path.relative_to(root).as_posix()] = file_hash(path)
+                    write_json(root / "attempts" / f"{request_id}.json", evidence)
                     if error and retryable and attempt < ex["max_attempts"] and not stop.is_set():
                         await asyncio.sleep(max(wait_seconds, min(30, 2 ** (attempt - 1) + random.random())))
                         continue
@@ -189,5 +249,35 @@ async def _execute(config, task, inputs, provider, root):
                        "unknown_cost_attempts": sum(not isinstance(c, (int, float)) for c in costs),
                        "request_limit": ex["max_requests"]}
             write_json(root / "execution_summary.json", summary)
+            for name, value in (("predictions.jsonl", predictions), ("failures.jsonl", failures)):
+                write_jsonl(invocation_root / name, value)
+            write_json(invocation_root / "execution_summary.json", summary)
+            write_json(invocation_root / "attempt_index.json", {p.name: file_hash(p) for p in (root / "attempts").glob("*.json")})
+            finish_stage(invocation_root, "infer", {"invocation_id": invocation_id, "task_id": task["task_id"]}, ["invocation.json", "predictions.jsonl", "failures.jsonl", "execution_summary.json", "attempt_index.json"], [task["task_id"]])
             db.close()
     return summary
+
+
+def verify_run(directory):
+    root = Path(directory).resolve()
+    manifest = read_json(root / "manifest.json")
+    verify_stage(root / "prepared")
+    count = 0
+    for folder in (root / "invocations").iterdir():
+        verify_stage(folder)
+        for name, expected in read_json(folder / "attempt_index.json").items():
+            path = root / "attempts" / name
+            if path.parent.resolve() != (root / "attempts").resolve() or file_hash(path) != expected:
+                raise ValueError("Attempt metadata changed")
+    for path in (root / "attempts").glob("*.json"):
+        attempt = read_json(path)
+        for name, expected in attempt["files"].items():
+            target = (root / name).resolve()
+            if not target.is_relative_to(root) or file_hash(target) != expected:
+                raise ValueError("Attempt payload changed")
+        count += 1
+    for prediction in __import__('llm_kt.common', fromlist=['read_jsonl']).read_jsonl(root / 'predictions.jsonl'):
+        evidence = read_json(root / 'attempts' / (prediction['local_request_id'] + '.json'))
+        if evidence.get('result_hash') != digest(prediction):
+            raise ValueError('Prediction evidence mismatch')
+    return {"run_id": manifest["run_id"], "verified_attempts": count}

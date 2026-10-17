@@ -5,14 +5,23 @@ from pathlib import Path
 from .config import load_config
 from .data import import_snapshot
 from .protocols import prepare, load_prepared
-from .runtime import infer, preview
+from .runtime import infer, preview, verify_run
 from .evaluation import evaluate, compare
 from .costs import estimate, save_estimate
+from .subsets import create_subset
 
 
 def main():
     parser = argparse.ArgumentParser(prog="llm-kt")
     sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("verify-run")
+    p.add_argument("--run", required=True)
+    p = sub.add_parser("subset")
+    p.add_argument("--parent", required=True)
+    p.add_argument("--output", required=True)
+    p.add_argument("--dataset", required=True)
+    p.add_argument("--fraction", type=float, default=0.001)
+    p.add_argument("--seed", type=int, default=42)
     p = sub.add_parser("import-pykt", help="Copy complete original sequence CSVs into a standalone snapshot")
     p.add_argument("--test", required=True)
     p.add_argument("--train-valid")
@@ -53,7 +62,11 @@ def main():
     p.add_argument("--output", help="Write JSON and Markdown reports")
     args = parser.parse_args()
     try:
-        if args.command == "import-pykt":
+        if args.command == "verify-run":
+            result = verify_run(args.run)
+        elif args.command == "subset":
+            result = create_subset(args.parent, args.output, args.dataset, args.fraction, args.seed)
+        elif args.command == "import-pykt":
             result = import_snapshot(args.test, args.output, args.dataset, args.representation, args.train_valid)
         elif args.command == "prepare":
             result = prepare(load_config(args.config), args.output)

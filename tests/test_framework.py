@@ -56,6 +56,47 @@ class FrameworkTests(unittest.TestCase):
             expected = [(s, t) for s in range(0, n, 200) if min(200, n - s) >= 3 for t in range(s + 1, min(s + 200, n))]
             self.assertEqual(segmented, expected)
 
+    def test_subset_selection_matches_cost_and_context(self):
+        from llm_kt.subsets import create_subset
+        from llm_kt.costs import request_character_totals
+        train = self.root / 'train.csv'
+        train.write_text('fold,uid,questions,concepts,responses\n0,t0,"1,2,3,4","1,2,3,4","0,1,0,1"\n1,t1,"1,2,3,4","1,2,3,4","1,0,1,0"\n')
+        parent = self.root / 'parent'
+        import_snapshot(FIXTURE, parent, 'demo', train_source=train)
+        subset = self.root / 'subset'
+        report = create_subset(parent, subset, 'sample', 0.5, 42)
+        self.assertEqual(report, create_subset(parent, subset, 'sample', 0.5, 42))
+        self.config['dataset']['snapshot'] = str(subset)
+        self.config['task'].update(maxlen=200, target_limit=2)
+        prepared = self.root / 'selected'
+        manifest = prepare(self.config, prepared)
+        self.assertEqual(manifest['n_targets'], 2)
+        self.assertEqual(request_character_totals(self.config)['n_requests'], 2)
+        _, targets, inputs = load_prepared(prepared)
+        original = {r['student_id']: r for r in read_sequences(FIXTURE, 'question_native')}
+        for target, item in zip(targets, inputs):
+            expected = original[target['student_id']]['events'][target['history_start']:target['event_index']]
+            self.assertEqual([h['correct'] for h in item.history], [bool(e['response']) for e in expected])
+            self.assertNotIn('response', item.current_item)
+
+    def test_trace_integrity_and_zero_request_resume(self):
+        from llm_kt.runtime import verify_run
+        prepared = self.prepared()
+        run = self.root / 'trace'
+        first = asyncio.run(infer(self.config, prepared, run))
+        self.assertGreater(first['attempts_this_invocation'], 0)
+        with patch('llm_kt.runtime.resolve_api_key', side_effect=AssertionError('Cache must not read credentials')):
+            second = asyncio.run(infer(self.config, prepared, run))
+        self.assertEqual(second['attempts_this_invocation'], 0)
+        self.assertEqual(verify_run(run)['verified_attempts'], first['n_success'])
+        prediction = read_jsonl(run / 'predictions.jsonl')[0]
+        response = run / 'responses' / (prediction['local_request_id'] + '.json')
+        response.write_text('{}')
+        with self.assertRaises(ValueError):
+            verify_run(run)
+        with self.assertRaises(ValueError):
+            asyncio.run(infer(self.config, prepared, run))
+
     def test_protocol_matches_copied_pykt_generators(self):
         import numpy as np
         # Execute only the copied pure sequence generation functions. No pykt imports.
