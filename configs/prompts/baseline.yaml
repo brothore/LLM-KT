@@ -1,0 +1,6 @@
+version: kt_baseline_v1
+evidence: none
+system: >-
+  Predict this student's probability of answering the current item correctly, based only on observed history.
+  IDs are identifiers, not item contents. Do not solve an imagined item.
+  Return only a JSON object with p_correct, a number from 0 to 1.

@@ -47,7 +47,7 @@ def preview(config, prepared, count=2):
     return result
 
 
-async def infer(config, prepared, run_directory):
+async def infer(config, prepared, run_directory, budget=None, allow_code_change=False):
     task, _, inputs = load_prepared(prepared, config)
     root = Path(run_directory).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,13 @@ async def infer(config, prepared, run_directory):
     if manifest_path.exists():
         old = read_json(manifest_path)
         if old["identity"] != run_identity:
-            raise ValueError("Run configuration/data changed; create a new run directory")
+            before = {k:v for k,v in old['identity'].items() if k!='source_sha256'}
+            after = {k:v for k,v in run_identity.items() if k!='source_sha256'}
+            if not allow_code_change or before != after:
+                raise ValueError("Run configuration/data changed; create a new run directory")
+            write_json(root / 'code_transitions' / (uuid4().hex + '.json'), {'original_manifest_sha256':file_hash(manifest_path),
+                       'original_source_sha256':old['identity']['source_sha256'], 'resumed_source_sha256':run_identity['source_sha256'],
+                       'at':datetime.now(timezone.utc).isoformat(), 'reason':'Explicit recovery after infrastructure fix; config and inputs unchanged'})
     else:
         write_json(manifest_path, {"identity": run_identity, "run_id": "run_" + uuid4().hex, "created_at": datetime.now(timezone.utc).isoformat(), "code": code_identity(), "package_version": "0.1.0"})
     # A process lock prevents concurrent writers/runners; OS releases it on crash.
@@ -86,12 +92,12 @@ async def infer(config, prepared, run_directory):
         else:
             import fcntl
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return await _execute(config, task, inputs, provider, root)
+        return await _execute(config, task, inputs, provider, root, budget)
     finally:
         lock.close()
 
 
-async def _execute(config, task, inputs, provider, root):
+async def _execute(config, task, inputs, provider, root, budget=None):
     model, ex = config["model"], config["execution"]
     key = None
     db = sqlite3.connect(root / "state.sqlite")
@@ -151,6 +157,8 @@ async def _execute(config, task, inputs, provider, root):
                     state = db.execute("SELECT attempts,request_hash FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
                     attempt = state[0] + 1
                     request_id = "attempt_" + uuid4().hex
+                    if budget is not None:
+                        budget.reserve(request_id, payload, model)
                     db.execute("UPDATE jobs SET status='running',attempts=? WHERE sample_id=?", (attempt, item.sample_id))
                     db.commit()
                     write_json(root / "requests" / f"{request_id}.json", payload)
@@ -208,6 +216,8 @@ async def _execute(config, task, inputs, provider, root):
                         if fatal:
                             stop.set()
                     usage = response.get("usage", {}) if isinstance(response, dict) else {}
+                    if budget is not None:
+                        budget.settle(request_id, usage.get('cost'))
                     db.execute("INSERT OR REPLACE INTO attempts VALUES(?,?,?,?,?,?)", (request_id, item.sample_id,
                                "failed" if error else "success", (time.monotonic() - tick) * 1000, canonical(usage), error))
                     db.commit()

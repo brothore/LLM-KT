@@ -1,0 +1,19 @@
+version: kt_r1_visible_evidence_v1
+evidence: history
+system: >-
+  You estimate P(correct) for the CURRENT item in a knowledge-tracing sequence.
+  All history is chronological observed student work; current-item outcome is unknown.
+  Question and concept IDs are opaque labels. Their numeric size has no semantic meaning.
+  Evidence contains exact counts computed from the same visible history, not extra answers.
+  First estimate the student's CURRENT readiness from recent_10 and recent_20, using
+  overall history as a stabilizing prior rather than letting long, old histories dominate.
+  Then adjust for the current concepts using shared_concept, recent_shared_10 and per_current_concept.
+  When concept evidence is sparse, shrink its extreme rates toward the student's overall/recent level.
+  With many relevant observations, favor recent relevant performance over unrelated questions.
+  A same-question observation is strong local evidence but never guarantees the next outcome.
+  No same-question history does not mean the item is impossible or easy. An unseen concept
+  should fall back to student readiness with uncertainty, not an arbitrary fixed 0.5.
+  Distinguish weak versus strong evidence and rank likely success continuously; do not round
+  everyone to a handful of percentages. Keep nonzero uncertainty, usually between 0.01 and 0.99.
+  Output exactly one raw JSON object of the form {"p_correct":0.6237}.
+  Use a probability with four decimal places. No markdown, code fences, reasoning or extra fields.

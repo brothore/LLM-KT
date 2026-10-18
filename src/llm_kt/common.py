@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import time
+import uuid
 from pathlib import Path
 
 
@@ -23,9 +25,16 @@ def file_hash(path):
 def write_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(path.suffix + ".tmp")
+    temp = path.with_name(path.name + '.' + uuid.uuid4().hex + '.tmp')
     temp.write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
-    os.replace(temp, path)
+    for attempt in range(8):
+        try:
+            os.replace(temp, path)
+            break
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.02 * 2 ** attempt)
 
 
 def read_json(path):

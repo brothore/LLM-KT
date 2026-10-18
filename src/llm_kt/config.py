@@ -10,7 +10,7 @@ DEFAULTS = {
     "input": {"template": "history_ids_v1", "history_policy": "protocol_exact"},
     "model": {"adapter": "openrouter_decisions", "model_id": "typesafe/jev-1.14",
               "endpoint": "https://openrouter.ai/api/alpha/decisions", "api_key_env": "OPENROUTER_API_KEY",
-              "api_key_file": "", "pricing_file": "", "probability_strategy": "noul", "parameters": {}},
+              "api_key_file": "", "pricing_file": "", "prompt_file": "", "probability_strategy": "noul", "parameters": {}},
     "execution": {"max_concurrency": 4, "max_attempts": 3, "timeout_seconds": 60,
                   "max_requests": 100, "requests_per_minute": 60, "replicate_id": "0"},
     "evaluation": {"profile": "standard_v1", "student_std_ddof": 1, "threshold": 0.5},
@@ -33,6 +33,10 @@ def load_config(path):
     if model["pricing_file"]:
         model["pricing_file"] = str((path.parent / model["pricing_file"]).resolve())
         model["pricing_snapshot"] = load_pricing(model["pricing_file"], model["model_id"])
+    if model['prompt_file']:
+        from .prompts import load_prompt
+        model['prompt_file'] = str((path.parent / model['prompt_file']).resolve())
+        model['prompt_snapshot'] = load_prompt(model['prompt_file'])
     if ds["split"] not in {"test", "train", "validation"}:
         raise ValueError("dataset.split must be test, train or validation")
     if task["protocol"] not in {"pykt_window", "pykt_segmented", "full_prefix"}:

@@ -1,4 +1,5 @@
 import json
+import re
 from .common import canonical
 from .domain import checked_probability
 
@@ -31,6 +32,9 @@ class Chat:
         self.config = config
 
     def request(self, item):
+        if self.config.get('prompt_snapshot'):
+            from .prompts import render
+            return {'model': self.config['model_id'], 'messages': render(item, self.config['prompt_snapshot']), **self.config['parameters']}
         return {"model": self.config["model_id"], "messages": [
             {"role": "system", "content": TASK}, {"role": "user", "content": canonical(item.state())}],
             **self.config["parameters"]}
@@ -42,7 +46,9 @@ class Chat:
         message = choice["message"]
         if message.get("refusal"):
             raise ValueError("Model refused")
-        content = json.loads(message["content"])
+        text = message['content'].strip()
+        fenced = re.fullmatch(r'```(?:json)?\s*(\{.*\})\s*```', text, re.DOTALL)
+        content = json.loads(fenced.group(1) if fenced else text)
         if not isinstance(content, dict) or set(content) != {"p_correct"}:
             raise ValueError("Expected exactly one p_correct field")
         return checked_probability(content["p_correct"])

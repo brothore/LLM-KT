@@ -1,0 +1,29 @@
+{
+  "description": "Paired provider price and valid-probability smoke test before prompt iteration",
+  "cases": [
+    {
+      "name": "probe_tenstorrent",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "tenstorrent/fp4",
+      "layout": "history_first_json",
+      "indices": [
+        150,
+        151,
+        152,
+        152
+      ]
+    },
+    {
+      "name": "probe_chutes",
+      "model": "qwen/qwen3.8-27b",
+      "provider": "chutes/fp8",
+      "layout": "history_first_json",
+      "indices": [
+        150,
+        151,
+        152,
+        152
+      ]
+    }
+  ]
+}

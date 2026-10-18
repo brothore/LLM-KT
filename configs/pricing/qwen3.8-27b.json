@@ -49,6 +49,15 @@
       "cache_read_per_million_usd": 0.049999999999999996,
       "cache_write_per_million_usd": null,
       "supports_implicit_caching": true
+    },
+    {
+      "provider": "Tenstorrent",
+      "tag": "tenstorrent/fp4",
+      "input_per_million_usd": 0.02,
+      "output_per_million_usd": 0.5,
+      "cache_read_per_million_usd": 0.009,
+      "cache_write_per_million_usd": null,
+      "supports_implicit_caching": true
     }
   ]
 }

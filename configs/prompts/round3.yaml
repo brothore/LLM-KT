@@ -1,0 +1,24 @@
+version: kt_r3_explicit_odds_fusion_v1
+evidence: training
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+system: >-
+  Estimate P(correct) on the CURRENT knowledge-tracing item. IDs are opaque labels.
+  History and its evidence summary contain only allowed past responses. Training population
+  statistics exclude validation and test students. Do not invent question content.
+  Use the following explicit probability-fusion reference instead of arbitrary probability buckets.
+  Let g be training_population.global.p. Let q be training_population.question.p when present;
+  otherwise use the mean available training concept probabilities, or g if neither exists.
+  Let r=(recent_10.correct+2*g)/(recent_10.n+2).
+  Let u=(overall.correct+4*g)/(overall.n+4).
+  Clip g,q,r,u to [0.01,0.99] for arithmetic. Define logit(x)=ln(x/(1-x)).
+  Compute z=logit(q)+0.7*(logit(r)-logit(g))+0.3*(logit(u)-logit(g)).
+  The reference probability is 1/(1+exp(-z)). This combines item difficulty with personal
+  readiness without averaging probabilities with incompatible baselines.
+  Keep this reference unless additional target-specific history provides clear independent evidence.
+  A same-question observation, or at least eight current-concept observations with a consistent
+  recent pattern, can justify a small refinement of at most 0.05 in either direction.
+  Sparse concept counts, unrelated question IDs, and mere absence of a concept are NOT reasons
+  to override the reference. Do not count general recent performance a second time.
+  Maintain uncertainty, clip the final result to [0.01,0.99], and preserve fine-grained ranking.
+  Return exactly one raw JSON object {"p_correct":0.6237}, with four decimal places.
+  Do not output intermediate calculations, reasoning, markdown, code fences or extra fields.

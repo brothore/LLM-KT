@@ -31,6 +31,18 @@
 - 缓存优化仅记录在 TODO；未获具体实施要求时，不为了缓存改变历史协议、输入事实或实验目标。
 - 检查使用 `python -m unittest discover -s tests -v`。真实付费调用与离线测试分开。
 
+## Prompt 迭代记忆（2026-10-18）
+
+- 用户要求先提交当前进度，再测Tenstorrent、至少三轮完整AUC迭代，每轮总结；开始前的检查点为a59ecdb。当前工作已完成，详见 `docs/Prompt三轮迭代结果.md` 及 `docs/prompt_iterations/` 三份复盘。
+- Tenstorrent四次同输入探测0.000150340 USD，低于Chutes的0.000273080 USD，因此后续固定Qwen3.8 27B / Tenstorrent fp4。允许规范化单层JSON代码围栏，仍拒绝额外解释/字段，保留原始响应。
+- fold0验证221目标的AUC：B0=0.737549，R1=0.767998，R2=0.798241，R3=0.766847。R2按验证选择，R3失败保留。三轮均221/221；不能把计划、小样本或诊断评分当完整迭代结果。
+- R2/R3的题目与知识点先验仅来自训练fold1–4，3148学生、887776作答；排除validation fold0与test。它是训练信息增强，不是纯文字改写。Prompt文件和先验哈希冻结在manifest中。
+- 测试前锁定R2，只运行B0/R2独立测试各272目标。test AUC：B0=0.777541，R2=0.766683；未证明AUC泛化增益，默认prompt未替换。不要以验证提升宣称部署成功，不要再用已报告的test继续挑prompt并称为独立测试。
+- 本轮没有进入token节省阶段。未来目标1应扩大开发验证、多fold检验或探索可审计的数值融合，不能只增加公式文字：R3实际输出明显偏离其参考计算。
+- 本轮已知含探测费用0.081412844 USD，B0中断的7次无响应请求保留未知费用预留0.010898560 USD；加前轮0.019365184 USD后仍在0.50授权内。剩余额度不自动授权新实验。
+- 模块：prompts.py、budget.py；入口 tools/run_prompt_experiment.py；配置 configs/prompts 与 configs/experiments。预算当前要求各run顺序启动，禁止多进程同时写同一budget文件。
+- Windows原子JSON写入有唯一临时文件与重试。恢复已收到响应使用recover_prompt_run.py，不付费重发；仅基础设施源码改变时显式记录allow-code-change，配置与数据必须一致，不可借此复用不同prompt结果。
+
 ## 缓存用法与成本实验记忆（2026-10-18）
 
 ### 最新相邻目标探索
