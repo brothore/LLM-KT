@@ -11,7 +11,7 @@ from llm_kt.common import read_json, write_json
 
 async def run(args):
     config = load_config(args.config)
-    budget = Budget(args.budget, '0.40')
+    budget = Budget(args.budget, args.budget_limit_usd)
     summary = await infer(config, args.prepared, args.run, budget, args.allow_code_change)
     report = evaluate(args.prepared, args.run)
     verify_run(args.run)
@@ -28,6 +28,7 @@ if __name__ == '__main__':
     p.add_argument('--prepared', required=True)
     p.add_argument('--run', required=True)
     p.add_argument('--budget', default='runs/prompt_iterations_20261018/budget.json')
+    p.add_argument('--budget-limit-usd', default='0.40', help='Explicit shared ledger limit; must match an existing ledger')
     p.add_argument('--allow-code-change', action='store_true', help='Record explicit source transition after infrastructure recovery; data/config must match')
     args = p.parse_args()
     asyncio.run(run(args))

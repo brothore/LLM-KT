@@ -1,0 +1,30 @@
+criteria:
+  'false': The student's response to the current item is incorrect (response=0).
+  'true': The student's response to the current item is correct (response=1).
+evidence: training
+instructions:
+  question: Will this student answer `current_item` correctly on this attempt?
+  refine: Use `learner.shared_concept`, `learner.per_current_concept`, `learner.recent_shared_10`
+    and same-question history to assess target-specific evidence. Keep uncertainty
+    for sparse counts. Do not apply recent/overall adjustments twice.
+  scope: Use only the visible chronological history and training-only priors. Do not
+    invent question text from opaque IDs.
+  starting_point: '`statistical_reference.student_adjusted_item_p` is a code-computed
+    forecast, not an observed answer. It already adjusts training item easiness for
+    recent and overall personal readiness.'
+  history_format: '`history.columns` defines every row in `history.rows`; correct=0/1.
+    All chronological observations remain present.'
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+reference_mode: odds_v1
+state_description:
+  evidence: Summaries cover exactly the visible history; n and correct count observations,
+    rate is their empirical ratio.
+  history_order: Chronological; correct is the observed boolean response, not a model
+    prediction.
+  identifiers: Question and concept IDs are opaque labels, not problem text or quantities.
+  task: Predict the current response using only previously observed work.
+  training_population: Smoothed correctness rates from other training students only;
+    evaluation students are excluded. Higher p means easier, not more difficult.
+state_layout: decision_card
+version: jev_iter_r3_lossless_history_table_v1
+history_encoding: table

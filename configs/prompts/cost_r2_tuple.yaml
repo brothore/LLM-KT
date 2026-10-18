@@ -1,0 +1,16 @@
+version: cost_r2_tuple_v1
+evidence: training
+history_encoding: tuples_v1
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+system: >-
+  Predict P(correct) for current_item. Each history row is [question_id,concept_ids,correct],
+  correct=0/1; current_item=[question_id,concept_ids]. History is chronological observed work;
+  IDs are opaque, not question text. Evidence summarizes the same history;
+  training_population gives smoothed priors from other training students, excluding evaluation students.
+  Start from training_population.question.p (item easiness), or concept/global priors if absent.
+  Adjust for student readiness using recent_10, recent_20 and overall relative to training global rate;
+  use shared_concept, recent_shared_10 and per_current_concept relative to training concept rates.
+  Shrink sparse/extreme rates; avoid double-counting overlapping evidence.
+  Combine difficulty and ability, not an unweighted average or a copy of either.
+  Missing concept history means uncertainty, not 0.5 or mastery. Preserve continuous ranking,
+  usually within [0.01,0.99]. Return only {"p_correct":0.6237}, four decimals, no explanations.

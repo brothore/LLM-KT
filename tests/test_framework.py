@@ -162,6 +162,68 @@ class FrameworkTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["n_valid_auc_students"], 2)
         self.assertEqual(len(read_jsonl(run / "predictions.jsonl")), 10)
 
+    def test_student_serial_runs_students_concurrently_without_internal_overlap(self):
+        prepared=self.prepared()
+        self.config['model'].update(adapter='openai_compatible_chat',model_id='synthetic',probability_strategy='json_probability')
+        self.config['execution'].update(student_serial=True,max_concurrency=8)
+        async def fake_post(client,url,**kwargs):
+            await asyncio.sleep(.01)
+            return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':'{"p_correct":0.6}'}}]})
+        run=self.root/'serial'
+        with patch('llm_kt.runtime.resolve_api_key',return_value=''), patch('httpx.AsyncClient.post',fake_post):
+            result=asyncio.run(infer(self.config,prepared,run))
+        self.assertEqual(result['n_success'],10)
+        _,targets,_=load_prepared(prepared)
+        mapping={t['sample_id']:t for t in targets}
+        groups={}
+        for path in (run/'attempts').glob('*.json'):
+            a=read_json(path);t=mapping[a['sample_id']]
+            groups.setdefault(t['student_id'],[]).append((t['event_index'],a))
+        for group in groups.values():
+            group.sort()
+            for (_,a),(_,b) in zip(group,group[1:]):
+                self.assertLessEqual(a['ended_at'],b['started_at'])
+        spans=[(min(a['started_at'] for _,a in g),max(a['ended_at'] for _,a in g)) for g in groups.values()]
+        self.assertTrue(any(a[0]<b[1] and b[0]<a[1] for i,a in enumerate(spans) for b in spans[i+1:]))
+
+    def test_budget_stop_drains_inflight_requests_and_finishes_evidence(self):
+        prepared=self.prepared()
+        self.config['model'].update(adapter='openai_compatible_chat',model_id='synthetic',probability_strategy='json_probability')
+        class OneRequestBudget:
+            used=False
+            def reserve(self,*args):
+                if self.used:raise ValueError('Experiment budget would be exceeded')
+                self.used=True
+            def settle(self,*args):pass
+        async def fake_post(client,url,**kwargs):
+            await asyncio.sleep(.01)
+            return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':'{"p_correct":0.6}'}}]})
+        run=self.root/'budget_stop'
+        with patch('llm_kt.runtime.resolve_api_key',return_value=''),patch('httpx.AsyncClient.post',fake_post):
+            result=asyncio.run(infer(self.config,prepared,run,OneRequestBudget()))
+        self.assertTrue(result['budget_exhausted'])
+        self.assertEqual(result['n_success'],1)
+        self.assertEqual(result['attempts_this_invocation'],1)
+        from llm_kt.runtime import verify_run
+        self.assertEqual(verify_run(run)['verified_attempts'],1)
+        self.assertTrue(all(read_json(p)['status']=='success' for p in (run/'attempts').glob('*.json')))
+
+    def test_total_deadline_records_timeout_without_losing_evidence(self):
+        prepared=self.prepared()
+        self.config['model'].update(adapter='openai_compatible_chat',model_id='synthetic',probability_strategy='json_probability')
+        self.config['execution'].update(total_timeout_seconds=.005,max_concurrency=1,max_requests=1,max_attempts=1)
+        async def slow_post(*args,**kwargs):await asyncio.sleep(.2)
+        run=self.root/'deadline'
+        with patch('llm_kt.runtime.resolve_api_key',return_value=''),patch('httpx.AsyncClient.post',slow_post):
+            result=asyncio.run(infer(self.config,prepared,run))
+        self.assertEqual(result['n_success'],0)
+        attempts=[read_json(p) for p in (run/'attempts').glob('*.json')]
+        self.assertEqual(len(attempts),1)
+        self.assertEqual(attempts[0]['error'],'RequestDeadlineExceeded')
+        self.assertEqual(attempts[0]['status'],'failed')
+        from llm_kt.runtime import verify_run
+        self.assertEqual(verify_run(run)['verified_attempts'],1)
+
     def test_request_cap_and_resume(self):
         prepared = self.prepared()
         self.config["execution"]["max_requests"] = 2

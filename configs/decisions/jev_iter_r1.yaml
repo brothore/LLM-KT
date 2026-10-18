@@ -1,0 +1,30 @@
+version: jev_iter_r1_structured_question_v1
+evidence: training
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+instructions:
+  question: Will this student answer `current_item` correctly on this attempt?
+  inspect:
+  - history
+  - evidence.training_population
+  - evidence.recent_10
+  - evidence.recent_20
+  - evidence.overall
+  - evidence.shared_concept
+  - evidence.per_current_concept
+  meaning: Forecast the next response, not certainty of mastery. IDs carry no question
+    text. Training p is population correctness, not this student's known answer.
+  combine: Use item easiness and personal readiness as complementary evidence. Prefer
+    supported recent/current-concept evidence, shrink sparse/extreme counts, and avoid
+    double-counting shared history. Missing concept history is uncertainty.
+criteria:
+  'true': The student's response to the current item is correct (response=1).
+  'false': The student's response to the current item is incorrect (response=0).
+state_description:
+  task: Predict the current response using only previously observed work.
+  history_order: Chronological; correct is the observed boolean response, not a model
+    prediction.
+  identifiers: Question and concept IDs are opaque labels, not problem text or quantities.
+  evidence: Summaries cover exactly the visible history; n and correct count observations,
+    rate is their empirical ratio.
+  training_population: Smoothed correctness rates from other training students only;
+    evaluation students are excluded. Higher p means easier, not more difficult.

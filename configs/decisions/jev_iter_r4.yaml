@@ -1,0 +1,32 @@
+criteria:
+  'true': The current response is incorrect (response=0).
+  'false': The current response is correct (response=1).
+evidence: training
+history_encoding: table
+instructions:
+  history_format: '`history.columns` defines every row in `history.rows`; correct=0/1.
+    All chronological observations remain present.'
+  question: Will this student answer `current_item` incorrectly on this attempt?
+  refine: Use `learner.shared_concept`, `learner.per_current_concept`, `learner.recent_shared_10`
+    and same-question history to assess target-specific evidence. Keep uncertainty
+    for sparse counts. Do not apply recent/overall adjustments twice.
+  scope: Use only the visible chronological history and training-only priors. Do not
+    invent question text from opaque IDs.
+  starting_point: '`statistical_reference.student_adjusted_item_incorrect_p` is the
+    code-computed chance of an INCORRECT response, not an observed answer. Other correctness
+    rates in the state use the opposite direction: high correctness means fewer errors.'
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+reference_mode: odds_v1
+state_description:
+  evidence: Summaries cover exactly the visible history; n and correct count observations,
+    rate is their empirical ratio.
+  history_order: Chronological; correct is the observed boolean response, not a model
+    prediction.
+  identifiers: Question and concept IDs are opaque labels, not problem text or quantities.
+  task: Predict the current response using only previously observed work.
+  training_population: Smoothed correctness rates from other training students only;
+    evaluation students are excluded. Higher p means easier, not more difficult.
+state_layout: decision_card
+version: jev_iter_r4_negative_event_v1
+positive_class: incorrect
+question_key: will_answer_incorrectly

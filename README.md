@@ -4,6 +4,10 @@
 
 仓库地址：[brothore/LLM-KT](https://github.com/brothore/LLM-KT)。支持决策模型和普通大模型，复用 pykt 数据协议，并提供学生级评估及离线成本估算。
 
+Qwen阶段现已暂停付费工作。最新数据、推荐配置、成果、失败记录和未结事项统一见 [Qwen阶段复盘与交接](docs/Qwen阶段复盘与交接.md)。当前采用按学生保留完整评价序列的开发集；旧0.1%稀疏时间步子集仅保留作历史探索记录。
+
+Jev采用独立 `decision_file` 和 `state/questions/noul`，不复用Chat prompt；[两样本适配验收](docs/Jev独立决策适配与冒烟验收.md)后已完成[四人492目标完整对比](docs/Jev完整开发集与Qwen对比.md)。Jev整体AUC=0.756513、学生mean=0.672589，费用约￥0.4424；高于Qwen baseline，低于R2和省钱版。大验证集尚未执行。
+
 ```powershell
 git clone https://github.com/brothore/LLM-KT.git
 cd LLM-KT
@@ -24,7 +28,7 @@ python tools/audit_sensitive.py --worktree --staged --history
 - pykt 完整学生序列 CSV 的项目内复制、哈希校验及训练测试学生隔离检查。
 - 题目级多知识点集合、单知识点数据、概念展开序列的受限重建。
 - `pykt_window`、`pykt_segmented`、`full_prefix` 目标及历史构造；稳定 sample/event ID，标签与模型输入分离。
-- OpenRouter Decisions Noul/Choice、OpenAI 兼容 Chat JSON 概率，以及离线 Mock。
+- OpenRouter Decisions Noul/Choice、OpenAI 兼容 Chat JSON/小数/整数概率解析，以及离线 Mock。整数输出虽已支持，但Qwen降本实验效果下降，不推荐。
 - 异步有界并发、请求速率控制、可恢复错误重试、SQLite 缓存、进程锁、断点续跑。
 - 整体 AUC/ACC/LogLoss/Brier、学生 AUC mean/std/IQR、有效学生和目标覆盖率；另有历史统计口径。
 - 相同任务上的多模型比较；不完整结果仅报告共同成功目标的探索性比较。
@@ -106,7 +110,7 @@ python -m llm_kt infer --config configs/jev.yaml --prepared data/prepared/assist
 
 `execution.max_requests` 是**本次命令的尝试次数上限**，包含重试；不是美元预算。相同配置继续运行 resume，可继续补齐目标。`max_attempts` 是每个目标在整个 run 的累计尝试上限，达到后不再重试。永久失败保留原因；更改配置需新建 run。
 
-基础版本未实现美元预算和 token 预算，不保证按金额限制花费。实际 usage.cost 可用时累计，否则计入未知费用数量。429/部分 5xx/连接异常可重试；鉴权、模型与请求参数等严重 HTTP 错误停止新派发。网络不确定状态下重试可能产生额外计费。
+普通 CLI infer/resume 默认未绑定金额预算。付费实验工具 `tools/run_prompt_experiment.py` 支持 `--budget` 与 `--budget-limit-usd`，通过持久化账本预留、结算和未知费用占额控制金额；共享账本仅支持依次执行，不支持多进程并写。金额触顶停止新派发并等待在途请求记录完成。实际 usage.cost 缺失时保留预留，不按零计算。429/部分 5xx/连接异常可重试；鉴权、模型与请求参数等严重 HTTP 错误停止新派发。网络不确定状态下重试可能产生额外计费。
 
 中断后成功结果以 SQLite 为准；resume 会重新导出预测文件。一个 run 同时只允许一个执行进程。请求和响应保存在 run 中，Authorization 不落盘；数据可能包含学生作答历史，应按实验数据管理。
 
@@ -152,10 +156,17 @@ python -m unittest discover -s tests -v
 
 完整设计和后续范围见 [设计方案](docs/大模型KT独立项目设计方案.md)。当前版本不包含模型训练、few-shot 检索、多步预测、自动模型能力发现或完整历史结果导入。
 
-已完成 NIPS 按各 split/fold 预测目标分层抽取 0.1%，以及 Jev/Qwen 各两条真实样本的全流程冒烟测试。数据集配置见 `configs/datasets/nips_task34_0p1pct.yaml`；小样本配置见 `configs/smoke/`。阶段缓存、唯一请求身份、输入输出追溯及验证命令见 [NIPS 子集与全流程冒烟验收](docs/NIPS子集与全流程冒烟验收.md)。真实数据和运行产物只保存在本地忽略目录。
+历史阶段完成过NIPS 0.1%稀疏预测目标抽样及Jev/Qwen冒烟测试，见 [NIPS 子集与全流程冒烟验收](docs/NIPS子集与全流程冒烟验收.md)。该抽样未保留每学生完整评价目标，现已退出正式评估；当前两级完整学生验证集见 [两级验证集说明](docs/两级完整学生验证集.md)。真实数据和运行产物只保存在本地忽略目录。
 
 本地结果缓存、服务端 prompt 缓存的区别、供应商配置、较早的重复请求对照及复现命令见 [缓存用法与小样本成本实测](docs/缓存用法与小样本成本实测.md)。较早的重复请求小样本未观察到远端命中，不能据此判断相邻目标是否可以复用历史。
 
-后续已完成 [KT 相邻历史前缀缓存探索](docs/KT相邻历史前缀缓存探索.md)：在 0.50 USD 预算内实付 0.019365184 USD，Qwen3.8/Chutes 的紧凑历史在前布局在增长样本上得到真实输入折扣，窗口滚动后未命中。候选布局目前只在独立实验工具中。
+已完成 [KT 相邻历史前缀缓存探索](docs/KT相邻历史前缀缓存探索.md)：Qwen3.8/Chutes增长样本观察到输入折扣，滑窗滚动后未命中。后续R2已实现可配置的历史在前、无损紧凑编码和可选学生串行；具体效果见 [R2降Token结果](docs/R2降Token优化结果.md)，不能将增长样本折扣外推整个数据集。
 
 已完成 [三轮完整 Prompt AUC 迭代](docs/Prompt三轮迭代结果.md)：Tenstorrent 成本更低；验证集最佳R2 AUC为0.798241，但独立测试为0.766683，未超过基线0.777541，因此未替换默认prompt。每轮假设、复盘、费用、配置与完整本地追溯均已保留。
+
+以上三轮使用旧稀疏目标集。后续已完成 [四人完整序列重验](docs/四人开发集Prompt重新验证结果.md) 和 [R2降Token优化](docs/R2降Token优化结果.md)：推荐配置 `configs/experiments/nips_validation_iteration_02cny_v1_r2_cost_optimized.yaml`，4人492目标AUC=0.782239，学生mean=0.716313；输入/输出token分别少29.79%/45.82%，本次费用约￥0.0631。只验证了小开发集，大验证集尚未推理，原基线配置保留。
+
+
+## Jev迭代阶段交接（2026-10-18）
+
+四轮候选、最佳完整复跑和原模板对照已完成，固定4学生492目标。推荐配置 `configs/experiments/nips_jev_optimized_validation.yaml`。最佳整体AUC .786681、复跑.787856；已知费用￥2.375435，未知预留￥.070965，停止付费。详见 [Jev多轮适配结果与交接](docs/Jev多轮适配结果与交接.md)。待核实未知账单；大验证未运行，新付费工作需另行授权。

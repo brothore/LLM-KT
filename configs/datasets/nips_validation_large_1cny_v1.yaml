@@ -1,0 +1,33 @@
+# Validation only; all selected students and time steps. No inference performed.
+dataset:
+  snapshot: ../../data/snapshots/nips_validation_large_1cny_v1
+  split: validation
+  validation_fold: 0
+task:
+  protocol: pykt_window
+  level: question
+  maxlen: 200
+  min_seq_len: 3
+model:
+  adapter: openai_compatible_chat
+  model_id: qwen/qwen3.8-27b
+  endpoint: https://openrouter.ai/api/v1/chat/completions
+  api_key_file: ../../../.secrets/openrouter.key
+  pricing_file: ../pricing/qwen3.8-27b.json
+  prompt_file: ../prompts/round2.yaml
+  probability_strategy: json_probability
+  parameters:
+    reasoning:
+      enabled: false
+    temperature: 0
+    max_tokens: 128
+    provider:
+      only:
+      - tenstorrent/fp4
+      allow_fallbacks: false
+execution:
+  max_requests: 10000
+  max_attempts: 2
+  max_concurrency: 8
+  requests_per_minute: 600
+  timeout_seconds: 60

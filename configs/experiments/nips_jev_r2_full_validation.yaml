@@ -1,0 +1,29 @@
+# Completed full validation; exact executed configuration is frozen in its run plan. New paid runs need explicit authorization and a new ledger.
+dataset:
+  snapshot: ../../data/snapshots/nips_validation_iteration_02cny_v1
+  split: validation
+  validation_fold: 0
+task:
+  protocol: pykt_window
+  level: question
+  maxlen: 200
+  min_seq_len: 3
+model:
+  adapter: openrouter_decisions
+  model_id: typesafe/jev-1.14
+  endpoint: https://openrouter.ai/api/alpha/decisions
+  api_key_file: ../../../.secrets/openrouter.key
+  pricing_file: ../pricing/jev-1.14-20261018.json
+  decision_file: ../decisions/jev_r2_v1.yaml
+  probability_strategy: noul
+  parameters:
+    provider:
+      only:
+      - typesafe
+      allow_fallbacks: false
+execution:
+  max_concurrency: 4
+  max_requests: 984
+  max_attempts: 2
+  requests_per_minute: 120
+  timeout_seconds: 60

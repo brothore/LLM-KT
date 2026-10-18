@@ -1,0 +1,22 @@
+version: jev_kt_r2_structured_noul_v1
+evidence: training
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+instructions: >-
+  Will this student answer `current_item` correctly, given `history` and `evidence`?
+  Judge the next observed response, not whether mastery is certain.
+  `evidence.training_population.question.p` describes item easiness; concept and global
+  rates are fallbacks. Compare `evidence.recent_10`, `evidence.recent_20` and
+  `evidence.overall` with the training global rate for personal readiness.
+  Use shared-concept and per-current-concept evidence for relevant knowledge;
+  discount sparse or extreme rates and do not double-count overlapping observations.
+  Item difficulty and student readiness both matter; neither a population rate alone
+  nor a simple unweighted average is sufficient. Missing concept history means uncertainty.
+criteria:
+  'true': The student's response to the current item is correct (response=1).
+  'false': The student's response to the current item is incorrect (response=0).
+state_description:
+  task: Predict the current response using only previously observed work.
+  history_order: Chronological; correct is the observed boolean response, not a model prediction.
+  identifiers: Question and concept IDs are opaque labels, not problem text or quantities.
+  evidence: Summaries cover exactly the visible history; n and correct count observations, rate is their empirical ratio.
+  training_population: Smoothed correctness rates from other training students only; evaluation students are excluded. Higher p means easier, not more difficult.

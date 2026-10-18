@@ -11,7 +11,7 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from pathlib import Path
 import httpx
-from .common import canonical, digest, read_json, write_json, write_jsonl, file_hash
+from .common import canonical, digest, read_json, read_jsonl, write_json, write_jsonl, file_hash
 from .artifacts import finish_stage, record_event, code_identity, verify_stage
 from .protocols import load_prepared
 from .providers import make_provider
@@ -114,10 +114,11 @@ async def _execute(config, task, inputs, provider, root, budget=None):
     db.commit()
     gate = RateGate(ex["requests_per_minute"])
     queue = asyncio.Queue()
+    pending = []
     for item in inputs:
         state = db.execute("SELECT status,attempts FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
         if state[0] == "pending" and state[1] < ex["max_attempts"]:
-            queue.put_nowait(item)
+            pending.append(item)
         elif state[0] == "success":
             cached = json.loads(db.execute("SELECT result FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()[0])
             evidence = read_json(root / "attempts" / (cached["local_request_id"] + ".json"))
@@ -127,6 +128,20 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                     raise ValueError("Cached attempt artifact hash mismatch")
             if evidence.get("result_hash") != digest(cached):
                 raise ValueError("Cached prediction differs from attempt evidence")
+    successors = {}
+    if ex.get('student_serial'):
+        from collections import defaultdict
+        by_student = defaultdict(list)
+        mapping = {t['sample_id']:t for t in read_jsonl(root/'prepared'/'targets.jsonl')}
+        for item in pending:
+            by_student[mapping[item.sample_id]['student_id']].append(item)
+        for items in by_student.values():
+            items.sort(key=lambda item:mapping[item.sample_id]['event_index'])
+            queue.put_nowait(items[0])
+            successors.update({a.sample_id:b for a,b in zip(items,items[1:])})
+    else:
+        for item in pending:
+            queue.put_nowait(item)
     if not queue.empty():
         try:
             key = resolve_api_key(model)
@@ -137,12 +152,13 @@ async def _execute(config, task, inputs, provider, root, budget=None):
     invocation_root = root / "invocations" / invocation_id
     write_json(invocation_root / "invocation.json", {"invocation_id": invocation_id, "run_id": read_json(root / "manifest.json")["run_id"], "started_at": datetime.now(timezone.utc).isoformat(), "code": code_identity()})
     dispatched, stop = 0, asyncio.Event()
+    budget_exhausted = False
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"} if key else {}
     started = time.monotonic()
 
     async with httpx.AsyncClient(timeout=ex["timeout_seconds"], follow_redirects=False) as client:
         async def worker():
-            nonlocal dispatched
+            nonlocal dispatched, budget_exhausted
             while not queue.empty() and not stop.is_set():
                 try:
                     item = queue.get_nowait()
@@ -158,7 +174,17 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                     attempt = state[0] + 1
                     request_id = "attempt_" + uuid4().hex
                     if budget is not None:
-                        budget.reserve(request_id, payload, model)
+                        try:
+                            budget.reserve(request_id, payload, model)
+                        except ValueError as exc:
+                            if str(exc) != 'Experiment budget would be exceeded':
+                                raise
+                            dispatched -= 1
+                            budget_exhausted = True
+                            stop.set()
+                            record_event(root, 'budget_stop', task['task_id'], False,
+                                         {'reason':'Reservation limit reached; drain existing HTTP requests'})
+                            break
                     db.execute("UPDATE jobs SET status='running',attempts=? WHERE sample_id=?", (attempt, item.sample_id))
                     db.commit()
                     write_json(root / "requests" / f"{request_id}.json", payload)
@@ -173,7 +199,7 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                             history = item.history
                             response = {"p_correct": (sum(h["correct"] for h in history) + 1) / (len(history) + 2), "model": "mock-history-frequency-v1"}
                         else:
-                            http = await client.post(model["endpoint"], headers=headers, json=payload)
+                            http = await asyncio.wait_for(client.post(model["endpoint"], headers=headers, json=payload), timeout=ex.get('total_timeout_seconds'))
                             raw = http.text
                             if key:
                                 raw = raw.replace(key, "[REDACTED]")
@@ -203,9 +229,14 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                                   "request_id": response.get("id", request_id), "local_request_id": request_id,
                                   "attempt_count": attempt, "request_hash": state[1], "usage": usage,
                                   "cost": usage.get("cost"), "latency_ms": (time.monotonic() - tick) * 1000}
+                        if model.get('decision_snapshot',{}).get('positive_class')=='incorrect' and model['probability_strategy']=='noul':
+                            result['probability_transform']='p_correct = 1 - raw_noul_incorrect'
                         db.execute("UPDATE jobs SET status='success',result=?,error=NULL WHERE sample_id=?", (canonical(result), item.sample_id))
-                    except (httpx.TransportError, ValueError, KeyError, TypeError, IndexError) as exc:
-                        if isinstance(exc, httpx.TransportError):
+                    except (TimeoutError, httpx.TransportError, ValueError, KeyError, TypeError, IndexError) as exc:
+                        if isinstance(exc, TimeoutError):
+                            retryable = True
+                            error = 'RequestDeadlineExceeded'
+                        elif isinstance(exc, httpx.TransportError):
                             retryable = True
                             error = type(exc).__name__
                         else:
@@ -232,6 +263,8 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                         await asyncio.sleep(max(wait_seconds, min(30, 2 ** (attempt - 1) + random.random())))
                         continue
                     break
+                if item.sample_id in successors and not stop.is_set():
+                    queue.put_nowait(successors[item.sample_id])
                 queue.task_done()
 
         try:
@@ -254,7 +287,8 @@ async def _execute(config, task, inputs, provider, root, budget=None):
             costs = [u.get("cost") for u in usage_rows if isinstance(u, dict)]
             summary = {"task_id": task["task_id"], "n_targets": len(inputs), "n_success": len(predictions),
                        "n_unfinished": len(failures), "attempts_this_invocation": dispatched,
-                       "elapsed_seconds": time.monotonic() - started, "fatal_http_error": stop.is_set(),
+                       "elapsed_seconds": time.monotonic() - started, "fatal_http_error": stop.is_set() and not budget_exhausted,
+                       "budget_exhausted": budget_exhausted,
                        "known_cost_usd": sum(c for c in costs if isinstance(c, (int, float))),
                        "unknown_cost_attempts": sum(not isinstance(c, (int, float)) for c in costs),
                        "request_limit": ex["max_requests"]}

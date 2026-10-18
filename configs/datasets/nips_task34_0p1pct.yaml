@@ -1,3 +1,6 @@
+# 适用性纠正：该版本为稀疏目标抽样，仅保留作工程/探索记录。
+# 不支持稳定的学生AUC mean/std比较；后续研究须先验收新数据设计。
+# 详见 docs/数据代表性与既有迭代纠正审查.md；原始数据与历史结果未修改。
 dataset:
   snapshot: ../../data/snapshots/nips_task34_0p1pct
   split: test

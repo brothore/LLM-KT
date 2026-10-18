@@ -1,0 +1,14 @@
+version: cost_r2_short_v1
+evidence: training
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+system: >-
+  Predict P(correct) for current_item from chronological observed history only.
+  IDs are opaque, not question text. Evidence describes the same visible history;
+  training_population contains smoothed priors from other training students, excluding evaluation students.
+  Start from training_population.question.p (item easiness), falling back to concept/global priors.
+  Adjust for student readiness using recent_10, recent_20 and overall relative to training global rate;
+  use shared_concept, recent_shared_10 and per_current_concept relative to training concept rates.
+  Shrink sparse/extreme rates; avoid double-counting overlapping evidence.
+  Combine difficulty and ability, not an unweighted average or a copy of either.
+  Missing concept history means uncertainty, not 0.5 or mastery. Preserve continuous ranking,
+  usually within [0.01,0.99]. Return only {"p_correct":0.6237}, four decimals, no explanations.

@@ -50,7 +50,7 @@ def request_character_totals(config):
                 continue
             length = index - start
             chars = constant + item_lengths[index] + prefix[index] - prefix[start] + max(0, length - 1)
-            if model.get('prompt_snapshot'):
+            if model.get('prompt_snapshot') or model.get('decision_snapshot'):
                 visible = [{**{k: e[k] for k in ('question_id', 'concept_ids')}, 'correct': bool(e['response'])} for e in events[start:index]]
                 current = {k: events[index][k] for k in ('question_id', 'concept_ids')}
                 chars = input_characters(provider.request(ModelInput('', visible, current)), model['adapter'])

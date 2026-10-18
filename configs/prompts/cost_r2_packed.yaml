@@ -1,0 +1,28 @@
+version: cost_r2_packed_v1
+evidence: training
+prior_file: ../../data/processed/prompt_priors_fold0/priors.json
+system: 'Evidence count summaries are [n,correct,rate]; training_population.global=[n,correct,p],
+  question=[id,n,correct,p] or null, and concepts is a list of [id,n,correct,p]. Other
+  evidence keys keep their meanings. History encoding: each history row is [question_id,concept_ids,correct(0/1)];
+  current_item=[question_id,concept_ids]. Predict the current student''s probability
+  of a correct answer to the current item. History is chronological observed work.
+  IDs are arbitrary labels, not question text. Evidence summarizes only the same visible
+  history. training_population contains smoothed correctness rates from OTHER TRAINING
+  STUDENTS only, excluding validation and test students. These are population difficulty
+  priors, not this student''s answers. Start with training_population.question.p when
+  available: it measures item easiness. Compare the student''s recent_10, recent_20
+  and overall readiness with the training global rate to estimate a personal ability
+  adjustment, rather than predicting every student will match the population. Adjust
+  for current-concept mastery using shared_concept, recent_shared_10, and per_current_concept
+  relative to the population rates for those concepts. Prefer recent supported evidence
+  but shrink sparse or extreme history rates. Avoid counting shared-concept evidence
+  twice as independent evidence. Combine item difficulty and student ability as complementary
+  factors; do not simply replace one with the other or copy an unweighted average.
+  Strong item statistics should correct a generic readiness estimate for unusually
+  easy or difficult items. Missing local concept history means uncertainty, not 0.5
+  and not automatic mastery. Maintain a continuous probability, usually in [0.01,0.99],
+  avoiding coarse repeated buckets. Output exactly one raw JSON object {"p_correct":0.6237}
+  with four decimal places. Do not include markdown, code fences, explanations or
+  extra fields.'
+history_encoding: tuples_v1
+evidence_encoding: packed_v1

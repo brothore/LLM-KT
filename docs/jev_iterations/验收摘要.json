@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "stage": "jev_iterations_20261018_v1",
+  "dataset": {
+    "students": 4,
+    "targets_per_run": 492,
+    "protocol": "complete students; observed history; development only"
+  },
+  "selected": "jev_iter_r4",
+  "known_cny": "2.375434740",
+  "reserved_cny": "0.070964544",
+  "total_with_reserve_cny": "2.446399284",
+  "unknown_attempts": 8,
+  "independent_student_auc_checks": 24,
+  "recommended_payloads_equal_selected": true,
+  "rounds": [
+    {
+      "name": "baseline_control",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7527826847548322,
+        "acc": 0.693089430894309,
+        "logloss": 0.5790939382895003,
+        "brier": 0.19692500000000002
+      },
+      "student_auc": {
+        "mean": 0.6654780767688139,
+        "std": 0.0445044406284922,
+        "median": 0.6564796373094692,
+        "min": 0.6271168041684759,
+        "max": 0.7218362282878412,
+        "range": 0.09471942411936529,
+        "q1": 0.6312945753736697,
+        "q3": 0.6906631387046134,
+        "iqr": 0.05936856333094365,
+        "ddof": 1
+      },
+      "attempts": 492,
+      "unknown_attempts": 0,
+      "known_cost_usd": 0.063205464,
+      "input_tokens": 1504892
+    },
+    {
+      "name": "jev_iter_r1",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7426895570000172,
+        "acc": 0.6890243902439024,
+        "logloss": 0.5838441306729404,
+        "brier": 0.1991609756097561
+      },
+      "student_auc": {
+        "mean": 0.6536847408893147,
+        "std": 0.05008305999174641,
+        "median": 0.6489180778694457,
+        "min": 0.6012700534759359,
+        "max": 0.7156327543424318,
+        "range": 0.11436270086649591,
+        "q1": 0.6211436097649892,
+        "q3": 0.6814592089937712,
+        "iqr": 0.060315599228782046,
+        "ddof": 1
+      },
+      "attempts": 494,
+      "unknown_attempts": 2,
+      "known_cost_usd": 0.06359808,
+      "input_tokens": 1514240
+    },
+    {
+      "name": "jev_iter_r2",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7699161335688682,
+        "acc": 0.7032520325203252,
+        "logloss": 0.5649094863942452,
+        "brier": 0.19084430894308943
+      },
+      "student_auc": {
+        "mean": 0.690182075831278,
+        "std": 0.05006699254871796,
+        "median": 0.6808416548437557,
+        "min": 0.6447025618758142,
+        "max": 0.7543424317617866,
+        "range": 0.10963986988597241,
+        "q1": 0.6537391431427504,
+        "q3": 0.7172845875322834,
+        "iqr": 0.06354544438953302,
+        "ddof": 1
+      },
+      "attempts": 494,
+      "unknown_attempts": 2,
+      "known_cost_usd": 0.06664686,
+      "input_tokens": 1586830
+    },
+    {
+      "name": "jev_iter_r3",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7810039960896633,
+        "acc": 0.7215447154471545,
+        "logloss": 0.554969033841106,
+        "brier": 0.18641991869918698
+      },
+      "student_auc": {
+        "mean": 0.6962469653641798,
+        "std": 0.05582835848683913,
+        "median": 0.6985385063116156,
+        "min": 0.6271168041684759,
+        "max": 0.7607940446650124,
+        "range": 0.1336772404965365,
+        "q1": 0.6701481849993383,
+        "q3": 0.7246372866764572,
+        "iqr": 0.054489101677118956,
+        "ddof": 1
+      },
+      "attempts": 492,
+      "unknown_attempts": 0,
+      "known_cost_usd": 0.04860492,
+      "input_tokens": 1157260
+    },
+    {
+      "name": "jev_iter_r4",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7866808444955152,
+        "acc": 0.7276422764227642,
+        "logloss": 0.5583764921284333,
+        "brier": 0.18758414634146345
+      },
+      "student_auc": {
+        "mean": 0.7061052321042487,
+        "std": 0.056517306185225456,
+        "median": 0.7034601719475668,
+        "min": 0.6405775075987842,
+        "max": 0.7769230769230768,
+        "range": 0.13634556932429265,
+        "q1": 0.6791951790387334,
+        "q3": 0.7303702250130821,
+        "iqr": 0.05117504597434874,
+        "ddof": 1
+      },
+      "attempts": 494,
+      "unknown_attempts": 2,
+      "known_cost_usd": 0.048646248,
+      "input_tokens": 1158244
+    },
+    {
+      "name": "repeat_selected",
+      "metrics": {
+        "n_targets": 492,
+        "auc": 0.7878556605553364,
+        "acc": 0.725609756097561,
+        "logloss": 0.557484739037413,
+        "brier": 0.1873910569105691
+      },
+      "student_auc": {
+        "mean": 0.7093843719783656,
+        "std": 0.0552958098962232,
+        "median": 0.7101192749827203,
+        "min": 0.6411202778983935,
+        "max": 0.7761786600496278,
+        "range": 0.13505838215123422,
+        "q1": 0.6891069411323524,
+        "q3": 0.7303967058287335,
+        "iqr": 0.041289764696381126,
+        "ddof": 1
+      },
+      "attempts": 494,
+      "unknown_attempts": 2,
+      "known_cost_usd": 0.048646248,
+      "input_tokens": 1158244
+    }
+  ],
+  "local_evidence_sha256": {
+    "final_acceptance/summary.json": "c08109f15dce0bc89bef656a3d777a40ddcbd05a48d0af69d8a47161ba1a8fcc",
+    "final_acceptance/artifact_manifest.json": "3c79654bbda76e7e46e70033c56a08324053321f683449ea7d0146efef77d2e1",
+    "budget.json": "0e978af87d9adbfb030016907bf8b9d5e17d99c48d76c0587ef8fac9be0333ec",
+    "plan/plan.json": "88973e156ff6e55467e64510651e1cf2d0654f45e5821235b9d813036facd39c",
+    "source_snapshot/artifact_manifest.json": "70d08a8a29bd9c6508ddc4bb6c1bb1bd917e574785c46790c159ca0d1b4430d8"
+  },
+  "private_evidence_policy": "Raw data, identifiers, requests, responses and credentials remain local and ignored."
+}

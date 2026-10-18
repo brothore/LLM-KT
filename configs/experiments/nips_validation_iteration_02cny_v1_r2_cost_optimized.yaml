@@ -1,0 +1,34 @@
+# Cost candidate validated on four development students; large validation not run.
+dataset:
+  snapshot: ../../data/snapshots/nips_validation_iteration_02cny_v1
+  split: validation
+  validation_fold: 0
+execution:
+  max_attempts: 2
+  max_concurrency: 8
+  max_requests: 10000
+  requests_per_minute: 600
+  timeout_seconds: 60
+  student_serial: false
+model:
+  adapter: openai_compatible_chat
+  api_key_file: ../../../.secrets/openrouter.key
+  endpoint: https://openrouter.ai/api/v1/chat/completions
+  model_id: qwen/qwen3.8-27b
+  parameters:
+    max_tokens: 16
+    provider:
+      allow_fallbacks: false
+      only:
+      - tenstorrent/fp4
+    reasoning:
+      enabled: false
+    temperature: 0
+  pricing_file: ../pricing/qwen3.8-27b.json
+  probability_strategy: decimal_probability
+  prompt_file: ../prompts/r2_cost_rows_decimal.yaml
+task:
+  level: question
+  maxlen: 200
+  min_seq_len: 3
+  protocol: pykt_window
