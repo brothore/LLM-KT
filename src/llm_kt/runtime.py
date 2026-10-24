@@ -47,7 +47,7 @@ def preview(config, prepared, count=2):
     return result
 
 
-async def infer(config, prepared, run_directory, budget=None, allow_code_change=False):
+async def infer(config, prepared, run_directory, budget=None, allow_code_change=False, retry_failed_once=False):
     task, _, inputs = load_prepared(prepared, config)
     root = Path(run_directory).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -92,12 +92,12 @@ async def infer(config, prepared, run_directory, budget=None, allow_code_change=
         else:
             import fcntl
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return await _execute(config, task, inputs, provider, root, budget)
+        return await _execute(config, task, inputs, provider, root, budget, retry_failed_once)
     finally:
         lock.close()
 
 
-async def _execute(config, task, inputs, provider, root, budget=None):
+async def _execute(config, task, inputs, provider, root, budget=None, retry_failed_once=False):
     model, ex = config["model"], config["execution"]
     key = None
     db = sqlite3.connect(root / "state.sqlite")
@@ -116,8 +116,10 @@ async def _execute(config, task, inputs, provider, root, budget=None):
     queue = asyncio.Queue()
     pending = []
     for item in inputs:
-        state = db.execute("SELECT status,attempts FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
+        state = db.execute("SELECT status,attempts,error FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()
         if state[0] == "pending" and state[1] < ex["max_attempts"]:
+            pending.append(item)
+        elif retry_failed_once and state[0]=='failed' and ((state[1]==ex['max_attempts'] and state[2] in {'RequestDeadlineExceeded','ReadTimeout','ConnectTimeout','ConnectError','ReadError','RemoteProtocolError'}) or (state[1]==ex['max_attempts']-1 and state[2]=='HTTP 529')):
             pending.append(item)
         elif state[0] == "success":
             cached = json.loads(db.execute("SELECT result FROM jobs WHERE sample_id=?", (item.sample_id,)).fetchone()[0])
@@ -211,7 +213,7 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                             evidence["http_status"] = http.status_code
                             evidence["response_headers"] = {k: v for k, v in http.headers.items() if k.lower() in {"content-type", "date", "x-request-id", "request-id", "retry-after"}}
                             if http.status_code >= 400:
-                                retryable = http.status_code == 429 or http.status_code in {500, 502, 503, 504}
+                                retryable = http.status_code == 429 or http.status_code in {500, 502, 503, 504, 529}
                                 fatal = http.status_code in {400, 401, 403, 404, 422}
                                 try:
                                     wait_seconds = min(60, max(0, float(http.headers.get("Retry-After", 0))))
@@ -231,6 +233,8 @@ async def _execute(config, task, inputs, provider, root, budget=None):
                                   "cost": usage.get("cost"), "latency_ms": (time.monotonic() - tick) * 1000}
                         if model.get('decision_snapshot',{}).get('positive_class')=='incorrect' and model['probability_strategy']=='noul':
                             result['probability_transform']='p_correct = 1 - raw_noul_incorrect'
+                        if model.get('prompt_snapshot',{}).get('output_event')=='incorrect':
+                            result['probability_transform']='p_correct = 1 - raw_chat_incorrect'
                         db.execute("UPDATE jobs SET status='success',result=?,error=NULL WHERE sample_id=?", (canonical(result), item.sample_id))
                     except (TimeoutError, httpx.TransportError, ValueError, KeyError, TypeError, IndexError) as exc:
                         if isinstance(exc, TimeoutError):

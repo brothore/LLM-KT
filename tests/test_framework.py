@@ -317,6 +317,59 @@ class FrameworkTests(unittest.TestCase):
             for path in (self.root / "remote" / directory).glob("*.json"):
                 self.assertNotIn("secret", path.read_text())
 
+    def test_explicit_transport_recovery_preserves_successes_and_is_bounded(self):
+        prepared=self.prepared()
+        self.config['model']={'adapter':'openrouter_decisions','model_id':'test','endpoint':'https://example.invalid','api_key_env':'TEST_KT_KEY','probability_strategy':'noul','parameters':{}}
+        self.config['execution'].update(max_concurrency=1,max_attempts=1)
+        calls=[]
+        async def post(client,url,**kwargs):
+            calls.append(kwargs['json'])
+            if len(calls)==1:raise httpx.ReadTimeout('synthetic')
+            return httpx.Response(200,json={'answers':{'will_answer_correctly':{'type':'noul','noul':.7}}})
+        run=self.root/'recovery'
+        with patch.dict(os.environ,{'TEST_KT_KEY':'synthetic'}),patch('httpx.AsyncClient.post',post):
+            first=asyncio.run(infer(self.config,prepared,run))
+            old={p.name:p.read_bytes() for p in (run/'attempts').glob('*.json')}
+            n=len(calls)
+            normal=asyncio.run(infer(self.config,prepared,run))
+            self.assertEqual(len(calls),n)
+            recovered=asyncio.run(infer(self.config,prepared,run,retry_failed_once=True))
+            self.assertEqual(len(calls),n+1)
+            self.assertEqual(recovered['n_success'],first['n_success']+1)
+            for name,data in old.items():self.assertEqual((run/'attempts'/name).read_bytes(),data)
+            asyncio.run(infer(self.config,prepared,run,retry_failed_once=True))
+            self.assertEqual(len(calls),n+1)
+
+    def test_failed_recovery_cannot_exceed_one_extra_attempt(self):
+        prepared=self.prepared()
+        self.config['model']={'adapter':'openrouter_decisions','model_id':'test','endpoint':'https://example.invalid','api_key_env':'TEST_KT_KEY','probability_strategy':'noul','parameters':{}}
+        self.config['execution'].update(max_concurrency=1,max_attempts=1)
+        calls=[]
+        async def post(client,url,**kwargs):
+            calls.append(1)
+            raise httpx.ReadTimeout('synthetic')
+        run=self.root/'failed_recovery'
+        with patch.dict(os.environ,{'TEST_KT_KEY':'synthetic'}),patch('httpx.AsyncClient.post',post):
+            asyncio.run(infer(self.config,prepared,run));n=len(calls)
+            asyncio.run(infer(self.config,prepared,run,retry_failed_once=True))
+            self.assertEqual(len(calls),2*n)
+            asyncio.run(infer(self.config,prepared,run,retry_failed_once=True))
+            self.assertEqual(len(calls),2*n)
+
+    def test_http_529_retries_within_attempt_limit(self):
+        prepared=self.prepared()
+        self.config['model']={'adapter':'openrouter_decisions','model_id':'test','endpoint':'https://example.invalid','api_key_env':'TEST_KT_KEY','probability_strategy':'noul','parameters':{}}
+        self.config['execution'].update(max_concurrency=1,max_attempts=2,max_requests=2)
+        calls=[]
+        async def post(client,url,**kwargs):
+            calls.append(1)
+            if len(calls)==1:return httpx.Response(529)
+            return httpx.Response(200,json={'answers':{'will_answer_correctly':{'type':'noul','noul':.7}}})
+        with patch.dict(os.environ,{'TEST_KT_KEY':'synthetic'}),patch('httpx.AsyncClient.post',post),patch('llm_kt.runtime.random.random',return_value=0):
+            result=asyncio.run(infer(self.config,prepared,self.root/'http529'))
+        self.assertEqual(len(calls),2)
+        self.assertEqual(result['n_success'],1)
+
     def test_credential_file_and_environment_priority(self):
         path = self.root / "test.key"
         path.write_text("\ufefffake-test-key\n", encoding="utf-8")

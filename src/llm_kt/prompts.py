@@ -8,7 +8,8 @@ from .kt_features import counts, training_priors, evidence
 def load_prompt(path):
     path = Path(path).resolve()
     prompt = yaml.safe_load(path.read_text(encoding='utf-8'))
-    assert_keys(prompt, {'version', 'system', 'evidence', 'prior_file', 'history_encoding', 'evidence_encoding'}, 'prompt')
+    assert_keys(prompt, {'version', 'system', 'evidence', 'prior_file', 'history_encoding', 'evidence_encoding', 'output_event'}, 'prompt')
+    if prompt.get('output_event','correct') not in {'correct','incorrect'}:raise ValueError('Unknown output event')
     if prompt.get('history_encoding', 'objects') not in {'objects', 'tuples_v1', 'rows_v1', 'numeric_tuples_v1'}:
         raise ValueError('Unknown history encoding')
     if prompt.get('evidence_encoding', 'objects') not in {'objects', 'packed_v1'}:

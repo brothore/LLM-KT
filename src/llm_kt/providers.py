@@ -48,6 +48,10 @@ class Chat:
             **self.config["parameters"]}
 
     def probability(self, response):
+        p=self._native_probability(response)
+        return checked_probability(1-p) if self.config.get('prompt_snapshot',{}).get('output_event')=='incorrect' else p
+
+    def _native_probability(self, response):
         choice = response["choices"][0]
         if choice.get("finish_reason") not in ("stop",):
             raise ValueError("Completion did not finish normally")
